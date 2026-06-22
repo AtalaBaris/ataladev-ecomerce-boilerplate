@@ -52,6 +52,15 @@ export function LoginForm() {
       <Button type="submit" className="w-full" isLoading={isLoading}>
         Giriş Yap
       </Button>
+
+      <p className="text-center text-sm">
+        <a
+          href="/admin/forgot-password"
+          className="text-emerald-400 hover:text-emerald-300"
+        >
+          Şifremi unuttum
+        </a>
+      </p>
     </form>
   );
 }

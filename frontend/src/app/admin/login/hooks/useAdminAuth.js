@@ -17,14 +17,20 @@ export function useAdminAuth() {
       setError(null);
 
       try {
-        const response = await authService.login(email, password);
+        const response = await authService.adminLogin(email, password);
 
         if (!response.success) {
           throw new Error(response.error?.message || 'Giriş başarısız.');
         }
 
-        const { user, token } = response.data;
-        setAuth(user, token);
+        const { user, accessToken } = response.data;
+
+        if (!authService.isAdminRole(user?.role)) {
+          await authService.logout();
+          throw new Error('Bu hesapla yönetim paneline erişim yetkiniz yok.');
+        }
+
+        setAuth(user, accessToken);
         router.push('/admin/dashboard');
         return response;
       } catch (err) {
@@ -41,8 +47,8 @@ export function useAdminAuth() {
     [router, setAuth],
   );
 
-  const logout = useCallback(() => {
-    authService.logout();
+  const logout = useCallback(async () => {
+    await authService.logout();
     useAuthStore.getState().logout();
     router.push('/admin/login');
   }, [router]);

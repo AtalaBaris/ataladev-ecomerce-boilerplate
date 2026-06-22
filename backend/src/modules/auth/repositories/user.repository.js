@@ -63,6 +63,19 @@ class UserRepository {
 
     return this._toEntity(record);
   }
+
+  /**
+   * @param {string} userId
+   * @param {string} passwordHash
+   */
+  async updatePassword(userId, passwordHash) {
+    const record = await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    return this._toEntity(record);
+  }
 }
 
 module.exports = { UserRepository };

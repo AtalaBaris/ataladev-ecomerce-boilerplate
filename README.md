@@ -35,7 +35,7 @@ Yeni bir müşteri geldiğinde sıfırdan mimari kurmak yerine bu repodan başla
 | **State & API** | Zustand, Axios, js-cookie |
 | **Doğrulama** | Zod (Backend DTO katmanı) |
 | **Altyapı** | Docker & Docker Compose |
-| **Kimlik Doğrulama** | bcryptjs, jsonwebtoken |
+| **Kimlik Doğrulama** | bcryptjs, jsonwebtoken, nodemailer (şifre sıfırlama) |
 
 ---
 
@@ -84,32 +84,43 @@ backend/
  ┃
  ┣ 📂 src/
  ┃ ┣ 📂 config/
- ┃ ┃ ┣ 📜 env.js            # Ortam değişkenleri (PORT, JWT, NODE_ENV)
+ ┃ ┃ ┣ 📜 env.js            # Ortam değişkenleri (PORT, JWT, SMTP, admin seed)
  ┃ ┃ ┗ 📜 database.js        # Prisma Client + PostgreSQL adapter (pg Pool)
  ┃ ┃
  ┃ ┣ 📂 core/               # Global altyapı (modüllerden bağımsız)
  ┃ ┃ ┣ 📂 errors/
  ┃ ┃ ┃ ┣ 📜 AppError.js      # Operasyonel hata sınıfı
  ┃ ┃ ┃ ┗ 📜 http-status.js   # HTTP durum kodları sabitleri
+ ┃ ┃ ┣ 📂 services/
+ ┃ ┃ ┃ ┗ 📜 email.service.js # SMTP / dev konsol mail gönderimi
  ┃ ┃ ┗ 📂 middleware/
  ┃ ┃   ┣ 📜 error-handler.js # Global Express hata yakalayıcı
- ┃ ┃   ┗ 📜 validate.middleware.js  # Zod tabanlı istek doğrulama
+ ┃ ┃   ┣ 📜 validate.middleware.js  # Zod tabanlı istek doğrulama
+ ┃ ┃   ┗ 📜 require-admin.js # Admin rol kontrolü (re-export)
  ┃ ┃
  ┃ ┣ 📂 modules/             # İZOLE SERVİSLER
  ┃ ┃ ┣ 📂 auth/              # Kimlik doğrulama modülü ✅
  ┃ ┃ ┃ ┣ 📂 controllers/
  ┃ ┃ ┃ ┃ ┗ 📜 auth.controller.js   # HTTP req/res yönetimi (iş mantığı yok)
+ ┃ ┃ ┃ ┣ 📂 constants/
+ ┃ ┃ ┃ ┃ ┗ 📜 roles.js             # USER / ADMIN rol sabitleri
  ┃ ┃ ┃ ┣ 📂 dtos/
  ┃ ┃ ┃ ┃ ┣ 📜 login.dto.js         # Giriş isteği Zod şeması
- ┃ ┃ ┃ ┃ ┗ 📜 register.dto.js      # Kayıt isteği Zod şeması
+ ┃ ┃ ┃ ┃ ┣ 📜 register.dto.js      # Kayıt isteği Zod şeması
+ ┃ ┃ ┃ ┃ ┗ 📜 password-reset.dto.js # Şifre sıfırlama / refresh Zod şemaları
  ┃ ┃ ┃ ┣ 📂 entities/
  ┃ ┃ ┃ ┃ ┗ 📜 user.entity.js       # User domain nesnesi + toPublic()
  ┃ ┃ ┃ ┣ 📂 middleware/
- ┃ ┃ ┃ ┃ ┗ 📜 auth.middleware.js   # JWT Bearer token doğrulama
+ ┃ ┃ ┃ ┃ ┣ 📜 auth.middleware.js   # JWT Bearer token doğrulama
+ ┃ ┃ ┃ ┃ ┣ 📜 require-admin.middleware.js  # ADMIN rol zorunluluğu
+ ┃ ┃ ┃ ┃ ┗ 📜 register-guard.middleware.js # Production'da public kayıt kapalı
  ┃ ┃ ┃ ┣ 📂 repositories/
- ┃ ┃ ┃ ┃ ┗ 📜 user.repository.js   # Prisma sorguları (findUnique, create)
+ ┃ ┃ ┃ ┃ ┣ 📜 user.repository.js
+ ┃ ┃ ┃ ┃ ┣ 📜 refresh-token.repository.js
+ ┃ ┃ ┃ ┃ ┣ 📜 password-reset.repository.js
+ ┃ ┃ ┃ ┃ ┗ 📜 login-log.repository.js
  ┃ ┃ ┃ ┣ 📂 services/
- ┃ ┃ ┃ ┃ ┗ 📜 auth.service.js      # İş kuralları (hash, JWT, kayıt/giriş)
+ ┃ ┃ ┃ ┃ ┗ 📜 auth.service.js      # Hash, JWT, refresh, reset, login log
  ┃ ┃ ┃ ┗ 📜 auth.routes.js         # /api/auth endpoint tanımları
  ┃ ┃ ┗ 📂 catalog/               # Ürün kataloğu modülü (planlanan — aynı yapı)
  ┃ ┃
@@ -123,12 +134,31 @@ backend/
 
 ### Backend API Endpoint'leri (Auth)
 
-| Method | Endpoint | Açıklama |
-|--------|----------|----------|
-| `GET` | `/health` | Sunucu durumu |
-| `POST` | `/api/auth/register` | Yeni kullanıcı kaydı |
-| `POST` | `/api/auth/login` | Giriş + JWT token |
-| `GET` | `/api/auth/me` | Profil (Bearer token gerekli) |
+| Method | Endpoint | Auth | Açıklama |
+|--------|----------|------|----------|
+| `GET` | `/health` | — | Sunucu durumu |
+| `POST` | `/api/auth/register` | — | Müşteri kaydı *(production'da kapalı)* |
+| `POST` | `/api/auth/login` | — | Müşteri girişi *(vitrin — ileride)* |
+| `GET` | `/api/auth/me` | Bearer | Müşteri profili |
+| `POST` | `/api/auth/admin/login` | — | Admin girişi *(yalnızca ADMIN rolü)* |
+| `POST` | `/api/auth/admin/refresh` | — | Access token yenileme |
+| `POST` | `/api/auth/admin/logout` | — | Refresh token iptali |
+| `POST` | `/api/auth/admin/forgot-password` | — | Şifre sıfırlama e-postası |
+| `POST` | `/api/auth/admin/reset-password` | — | Yeni şifre belirleme |
+| `GET` | `/api/auth/admin/me` | Admin | Admin profili |
+| `GET` | `/api/auth/admin/login-logs` | Admin | Son giriş denemeleri |
+
+### Auth Güvenlik Özellikleri
+
+| Özellik | Detay |
+|---------|--------|
+| **Rol ayrımı** | Admin paneli yalnızca `ADMIN` rolü; müşteri `USER` |
+| **Access + refresh token** | Access 24h, refresh 7d; refresh hash'lenerek DB'de saklanır |
+| **Login logları** | E-posta, IP, user-agent, başarı/başarısızlık; 30 gün sonra otomatik silinir |
+| **Şifre sıfırlama** | Tek kullanımlık token; reset sonrası tüm refresh token'lar iptal |
+| **Register guard** | Production'da `/register` kapalı (`ENABLE_PUBLIC_REGISTER=true` ile açılır) |
+| **Şifre hash** | bcrypt, 12 salt round |
+| **Dev mail** | SMTP boşsa sıfırlama linki yalnızca backend terminaline yazılır |
 
 ---
 
@@ -173,6 +203,10 @@ frontend/
  ┃ ┃ ┃ ┃ ┣ 📂 components/          # LoginForm.jsx
  ┃ ┃ ┃ ┃ ┣ 📂 hooks/               # useAdminAuth.js
  ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
+ ┃ ┃ ┃ ┣ 📂 forgot-password/       # Şifremi unuttum
+ ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
+ ┃ ┃ ┃ ┣ 📂 reset-password/        # Yeni şifre belirleme (?token=…)
+ ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
  ┃ ┃ ┃ ┣ 📂 dashboard/             # Admin İstatistikleri
  ┃ ┃ ┃ ┃ ┣ 📂 components/          # RevenueChart.jsx, StatCard.jsx, RecentOrders.jsx
  ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
@@ -206,7 +240,8 @@ frontend/
  ┃ ┃ ┃ ┣ 📜 Sidebar.jsx            # Admin paneli sol menüsü
  ┃ ┃ ┃ ┗ 📜 AdminHeader.jsx        # Admin üst bar (çıkış, kullanıcı bilgisi)
  ┃ ┃ ┗ 📂 providers/
- ┃ ┃   ┗ 📜 ThemeProvider.jsx      # Dark/Light mod yönetimi + oturum hydrate
+ ┃ ┃   ┣ 📜 ThemeProvider.jsx      # Dark/Light mod yönetimi
+ ┃ ┃   ┗ 📜 AdminSessionProvider.jsx  # Admin oturum hydrate (yalnızca /admin)
  ┃ ┃
  ┃ ┣ 📂 hooks/                     # GLOBAL CUSTOM HOOKS
  ┃ ┃ ┣ 📜 useClickOutside.js       # Modalları kapatmak için
@@ -285,6 +320,7 @@ cd backend
 cp .env.example .env        # İlk kurulumda — değerleri düzenle
 npm install
 npx prisma migrate dev      # Tabloları oluştur
+npm run prisma:seed         # Admin kullanıcısı (.env ADMIN_* değerleri)
 npm run dev                 # http://localhost:3000
 ```
 
@@ -298,14 +334,50 @@ npm run dev -- -p 3001      # http://localhost:3001
 
 > Backend ve frontend aynı anda çalışırken port çakışması olmaması için Next.js'i `3001` portunda başlatın.
 
-### 5. Test kullanıcısı oluştur
+### 5. Admin kullanıcısı
 ```bash
-curl -X POST http://localhost:3000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@atala.com","password":"password123","firstName":"Admin","lastName":"User"}'
+cd backend
+npm run prisma:seed
 ```
 
+Varsayılan giriş (`backend/.env` içindeki `ADMIN_EMAIL` / `ADMIN_PASSWORD`):
+- E-posta: `admin@atala.com`
+- Şifre: `.env` dosyasındaki `ADMIN_PASSWORD`
+
 Admin paneli: **http://localhost:3001/admin/login**
+
+---
+
+## Login Logları (Terminal)
+
+### Yöntem 1 — npm script (önerilen)
+```bash
+cd backend
+npm run logs:login        # Son 20 kayıt
+npm run logs:login 50     # Son 50 kayıt
+```
+
+### Yöntem 2 — API (admin token gerekli)
+```bash
+# 1) Admin girişi — accessToken al
+curl -s -X POST http://localhost:3000/api/auth/admin/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@atala.com","password":"SIFRENIZ"}'
+
+# 2) Logları listele
+curl -s http://localhost:3000/api/auth/admin/login-logs?limit=20 \
+  -H "Authorization: Bearer ACCESS_TOKEN_BURAYA" | python3 -m json.tool
+```
+
+### Yöntem 3 — Prisma Studio (görsel)
+```bash
+cd backend
+npm run prisma:studio
+```
+`login_logs` tablosunu açın.
+
+### Şifre sıfırlama (geliştirme)
+SMTP yapılandırılmadıysa sıfırlama linki **yalnızca backend terminalinde** görünür (`npm run dev` penceresi). Frontend genel bir onay mesajı gösterir; link API yanıtında dönmez.
 
 ---
 
@@ -335,6 +407,8 @@ Her yeni freelance işinde şu adımları izleyin:
 | `frontend/.env.example` | ✅ Evet | Şablon |
 | `frontend/.env.local` | ❌ Hayır | API URL |
 
+**Backend önemli değişkenler:** `JWT_SECRET`, `APP_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ENABLE_PUBLIC_REGISTER`, `LOGIN_LOG_RETENTION_DAYS`, `PASSWORD_RESET_EXPIRES_MINUTES`, `SMTP_*`
+
 ```bash
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env.local
@@ -362,7 +436,7 @@ git push -u origin main
 
 | Modül | Backend | Frontend | Durum |
 |-------|---------|----------|-------|
-| Auth | ✅ | ✅ Admin login | Hazır |
+| Auth | ✅ Tam (admin güvenlik) | ✅ Login, forgot/reset, middleware | Hazır |
 | Catalog | 🔲 | 🔲 Placeholder | Sırada |
 | Orders | 🔲 | 🔲 Placeholder | Sırada |
 | Cart | — | 🔲 Zustand store | Kısmi |
