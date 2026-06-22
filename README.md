@@ -1,6 +1,8 @@
-# Atala E-Commerce Boilerplate
+# Atala E-Commerce Boilerplate (Microservice Architecture)
 
 > Freelance ve ajans projeleri için hazırlanmış, **kopyala → özelleştir → yayınla** mantığıyla çalışan modüler e-ticaret iskeleti.
+
+Bu proje, yüksek performanslı, ölçeklenebilir ve tam izole edilmiş **mikro-servis benzeri bir monolit (Modüler Monolit)** e-ticaret altyapısıdır. Domain-Driven Design (DDD) ve Clean Architecture prensipleriyle saf JavaScript (ES6+) kullanılarak inşa edilmiştir.
 
 Yeni bir müşteri geldiğinde sıfırdan mimari kurmak yerine bu repodan başlayın; marka renklerini, logoyu ve içerikleri değiştirerek hızlıca canlıya alın.
 
@@ -24,7 +26,7 @@ Yeni bir müşteri geldiğinde sıfırdan mimari kurmak yerine bu repodan başla
 
 ---
 
-## Tech Stack
+## 🛠 Tech Stack
 
 | Katman | Teknolojiler |
 |--------|-------------|
@@ -37,28 +39,270 @@ Yeni bir müşteri geldiğinde sıfırdan mimari kurmak yerine bu repodan başla
 
 ---
 
-## Hızlı Başlangıç
+## 🏛 Mimari Felsefe (Domain-Driven Design)
+
+Backend yapısı tamamen izole modüllerden oluşur. Her servis (`auth`, `catalog`, `orders` vb.) kendi kapalı ekosistemine sahiptir ve şu katmanlardan oluşur:
+
+1. **DTO (Data Transfer Object):** İsteklerin Zod ile doğrulandığı güvenlik katmanı.
+2. **Entity:** Veritabanı tablolarının nesne (Object) karşılığı.
+3. **Repository:** Sadece veritabanı ile konuşan (Prisma/SQL), iş mantığından arındırılmış katman.
+4. **Service:** Tüm iş kurallarının (Business Logic) çalıştığı merkez.
+5. **Controller:** HTTP İstek/Cevap (Req/Res) döngüsünü yöneten yönlendirici.
+
+Hiçbir modül, başka bir modülün veritabanı sorgusunu doğrudan çalıştıramaz. İletişim sadece Service katmanları üzerinden, `try/catch` bloklarıyla izole edilerek yapılır (**Graceful Degradation**).
+
+Frontend tarafında **Feature-Sliced Design (FSD)** prensiplerine uygun, sayfa bazlı bileşen izolasyonu ve merkezi servis katmanı kullanılır:
+
+- `(store)/` → müşteri vitrini (route group, URL'de görünmez)
+- `admin/` → yönetim paneli
+- `components/ui/` → tekrar kullanılabilir atomik bileşenler
+- `services/` → tüm API çağrıları (bileşenlerde doğrudan `fetch` yok)
+
+---
+
+## 📂 Proje Kök Dizini
+
+```text
+atala-ecommerce-boilerplate/
+ ┣ 📂 backend/              # Express API (Modüler Monolit)
+ ┣ 📂 frontend/             # Next.js App Router (Vitrin + Admin Panel)
+ ┣ 📜 docker-compose.yml    # PostgreSQL container tanımı
+ ┣ 📜 .gitignore            # Gizli dosyalar hariç tutulur (.env, node_modules…)
+ ┣ 📜 LICENSE               # MIT lisansı
+ ┗ 📜 README.md
+```
+
+---
+
+## 📂 Backend Dizin Yapısı
+
+```text
+backend/
+ ┣ 📂 prisma/
+ ┃ ┣ 📂 migrations/         # Veritabanı migration dosyaları
+ ┃ ┗ 📜 schema.prisma       # Prisma şeması (User modeli vb.)
+ ┃
+ ┣ 📂 src/
+ ┃ ┣ 📂 config/
+ ┃ ┃ ┣ 📜 env.js            # Ortam değişkenleri (PORT, JWT, NODE_ENV)
+ ┃ ┃ ┗ 📜 database.js        # Prisma Client + PostgreSQL adapter (pg Pool)
+ ┃ ┃
+ ┃ ┣ 📂 core/               # Global altyapı (modüllerden bağımsız)
+ ┃ ┃ ┣ 📂 errors/
+ ┃ ┃ ┃ ┣ 📜 AppError.js      # Operasyonel hata sınıfı
+ ┃ ┃ ┃ ┗ 📜 http-status.js   # HTTP durum kodları sabitleri
+ ┃ ┃ ┗ 📂 middleware/
+ ┃ ┃   ┣ 📜 error-handler.js # Global Express hata yakalayıcı
+ ┃ ┃   ┗ 📜 validate.middleware.js  # Zod tabanlı istek doğrulama
+ ┃ ┃
+ ┃ ┣ 📂 modules/             # İZOLE SERVİSLER
+ ┃ ┃ ┣ 📂 auth/              # Kimlik doğrulama modülü ✅
+ ┃ ┃ ┃ ┣ 📂 controllers/
+ ┃ ┃ ┃ ┃ ┗ 📜 auth.controller.js   # HTTP req/res yönetimi (iş mantığı yok)
+ ┃ ┃ ┃ ┣ 📂 dtos/
+ ┃ ┃ ┃ ┃ ┣ 📜 login.dto.js         # Giriş isteği Zod şeması
+ ┃ ┃ ┃ ┃ ┗ 📜 register.dto.js      # Kayıt isteği Zod şeması
+ ┃ ┃ ┃ ┣ 📂 entities/
+ ┃ ┃ ┃ ┃ ┗ 📜 user.entity.js       # User domain nesnesi + toPublic()
+ ┃ ┃ ┃ ┣ 📂 middleware/
+ ┃ ┃ ┃ ┃ ┗ 📜 auth.middleware.js   # JWT Bearer token doğrulama
+ ┃ ┃ ┃ ┣ 📂 repositories/
+ ┃ ┃ ┃ ┃ ┗ 📜 user.repository.js   # Prisma sorguları (findUnique, create)
+ ┃ ┃ ┃ ┣ 📂 services/
+ ┃ ┃ ┃ ┃ ┗ 📜 auth.service.js      # İş kuralları (hash, JWT, kayıt/giriş)
+ ┃ ┃ ┃ ┗ 📜 auth.routes.js         # /api/auth endpoint tanımları
+ ┃ ┃ ┗ 📂 catalog/               # Ürün kataloğu modülü (planlanan — aynı yapı)
+ ┃ ┃
+ ┃ ┣ 📜 app.js                 # Express uygulaması (CORS, rotalar, 404)
+ ┃ ┗ 📜 server.js              # Port dinleyici + DB bağlantı yönetimi
+ ┃
+ ┣ 📜 .env.example             # Örnek ortam değişkenleri (commit edilir)
+ ┣ 📜 prisma.config.ts         # Prisma 7 yapılandırması
+ ┗ 📜 package.json
+```
+
+### Backend API Endpoint'leri (Auth)
+
+| Method | Endpoint | Açıklama |
+|--------|----------|----------|
+| `GET` | `/health` | Sunucu durumu |
+| `POST` | `/api/auth/register` | Yeni kullanıcı kaydı |
+| `POST` | `/api/auth/login` | Giriş + JWT token |
+| `GET` | `/api/auth/me` | Profil (Bearer token gerekli) |
+
+---
+
+## 📂 Frontend Dizin Yapısı
+
+```text
+frontend/
+ ┣ 📂 public/                      # Statik dosyalar (logolar, ikonlar, manifest, robots.txt)
+ ┃ ┣ 📂 images/                    # Ürün ve banner görselleri
+ ┃ ┣ 📂 icons/                     # SVG / PNG ikon seti
+ ┃ ┣ 📜 favicon.ico
+ ┃ ┣ 📜 manifest.json              # PWA manifest
+ ┃ ┗ 📜 robots.txt
+ ┃
+ ┣ 📂 src/
+ ┃ ┣ 📂 app/                       # NEXT.JS APP ROUTER (Sayfalar ve Rotalar)
+ ┃ ┃ ┣ 📂 (store)/                 # --- MÜŞTERİ VİTRİNİ (Route Group) ---
+ ┃ ┃ ┃ ┣ 📂 about/                 # Hakkımızda
+ ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
+ ┃ ┃ ┃ ┣ 📂 contact/               # İletişim ve Harita
+ ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
+ ┃ ┃ ┃ ┣ 📂 products/              # Ürün Listeleme / Kategori Sayfası
+ ┃ ┃ ┃ ┃ ┣ 📂 [slug]/              # Tekil Ürün Detay Sayfası
+ ┃ ┃ ┃ ┃ ┃ ┣ 📂 components/        # ImageGallery.jsx, VariationSelect.jsx
+ ┃ ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
+ ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
+ ┃ ┃ ┃ ┣ 📂 cart/                  # Alışveriş Sepeti
+ ┃ ┃ ┃ ┃ ┣ 📂 components/          # CartItem.jsx, CartSummary.jsx
+ ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
+ ┃ ┃ ┃ ┣ 📂 checkout/              # Ödeme Adımı
+ ┃ ┃ ┃ ┃ ┣ 📂 components/          # AddressForm.jsx, PaymentIframe.jsx
+ ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
+ ┃ ┃ ┃ ┣ 📂 profile/               # Müşteri Paneli
+ ┃ ┃ ┃ ┃ ┣ 📂 orders/              # Müşteri Sipariş Geçmişi
+ ┃ ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
+ ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
+ ┃ ┃ ┃ ┣ 📜 layout.jsx             # Vitrin Layout'u (Navbar, Footer)
+ ┃ ┃ ┃ ┗ 📜 page.jsx               # Vitrin Ana Sayfası (Hero Banner, Featured Products)
+ ┃ ┃ ┃
+ ┃ ┃ ┣ 📂 admin/                   # --- YÖNETİM PANELİ ---
+ ┃ ┃ ┃ ┣ 📂 login/                 # Admin Giriş
+ ┃ ┃ ┃ ┃ ┣ 📂 components/          # LoginForm.jsx
+ ┃ ┃ ┃ ┃ ┣ 📂 hooks/               # useAdminAuth.js
+ ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
+ ┃ ┃ ┃ ┣ 📂 dashboard/             # Admin İstatistikleri
+ ┃ ┃ ┃ ┃ ┣ 📂 components/          # RevenueChart.jsx, StatCard.jsx, RecentOrders.jsx
+ ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
+ ┃ ┃ ┃ ┣ 📂 products/              # Ürün Yönetimi
+ ┃ ┃ ┃ ┃ ┣ 📂 [id]/                # Ürün Düzenleme Sayfası
+ ┃ ┃ ┃ ┃ ┣ 📂 components/          # ProductTable.jsx, AddProductModal.jsx, ImageUploader.jsx
+ ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
+ ┃ ┃ ┃ ┣ 📂 orders/                # Sipariş Yönetimi
+ ┃ ┃ ┃ ┃ ┣ 📂 components/          # OrderListTable.jsx, OrderStatusDropdown.jsx
+ ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
+ ┃ ┃ ┃ ┣ 📂 settings/              # Site Ayarları (Logo, İletişim bilgileri güncelleme)
+ ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
+ ┃ ┃ ┃ ┗ 📜 layout.jsx             # Admin Layout'u (Sidebar, Header, AuthGuard)
+ ┃ ┃ ┃
+ ┃ ┃ ┣ 📜 globals.css              # Tailwind direktifleri ve global CSS değişkenleri (Dark mode)
+ ┃ ┃ ┣ 📜 layout.jsx               # Root Layout (Tüm projenin fontları, meta verileri)
+ ┃ ┃ ┗ 📜 not-found.jsx            # Özel 404 Sayfası
+ ┃ ┃
+ ┃ ┣ 📂 components/                # GLOBAL UI BİLEŞENLERİ (Her Yerde Kullanılabilenler)
+ ┃ ┃ ┣ 📂 ui/                      # Atomik Elementler (Shadcn UI tarzı)
+ ┃ ┃ ┃ ┣ 📜 Button.jsx
+ ┃ ┃ ┃ ┣ 📜 Input.jsx
+ ┃ ┃ ┃ ┣ 📜 Textarea.jsx
+ ┃ ┃ ┃ ┣ 📜 Badge.jsx              # Örn: Stokta, Tükendi, Kargolandı etiketleri
+ ┃ ┃ ┃ ┣ 📜 Modal.jsx
+ ┃ ┃ ┃ ┣ 📜 Spinner.jsx
+ ┃ ┃ ┃ ┗ 📜 Toast.jsx              # Bildirim mesajları (Başarılı, Hata vb.)
+ ┃ ┃ ┣ 📂 layout/                  # Yapısal Bileşenler
+ ┃ ┃ ┃ ┣ 📜 Navbar.jsx             # Vitrin üst menüsü
+ ┃ ┃ ┃ ┣ 📜 Footer.jsx             # Vitrin alt bilgi alanı
+ ┃ ┃ ┃ ┣ 📜 Sidebar.jsx            # Admin paneli sol menüsü
+ ┃ ┃ ┃ ┗ 📜 AdminHeader.jsx        # Admin üst bar (çıkış, kullanıcı bilgisi)
+ ┃ ┃ ┗ 📂 providers/
+ ┃ ┃   ┗ 📜 ThemeProvider.jsx      # Dark/Light mod yönetimi + oturum hydrate
+ ┃ ┃
+ ┃ ┣ 📂 hooks/                     # GLOBAL CUSTOM HOOKS
+ ┃ ┃ ┣ 📜 useClickOutside.js       # Modalları kapatmak için
+ ┃ ┃ ┣ 📜 useDebounce.js           # Arama inputlarında gecikmeli istek atmak için
+ ┃ ┃ ┗ 📜 useMediaQuery.js          # Mobil/Desktop ekran boyutunu JS tarafında yakalamak için
+ ┃ ┃
+ ┃ ┣ 📂 services/                  # AXIOS API KATMANI (Backend ile Haberleşme)
+ ┃ ┃ ┣ 📜 api.js                   # Merkezi Axios instance (Interceptor'lar, Token ekleme)
+ ┃ ┃ ┣ 📜 auth.service.js          # login, logout, verifyToken
+ ┃ ┃ ┣ 📜 product.service.js       # getProducts, getProductBySlug, createProduct
+ ┃ ┃ ┣ 📜 cart.service.js          # Sepet senkronizasyonu (Veritabanı bazlı ise)
+ ┃ ┃ ┗ 📜 order.service.js         # createOrder, getOrders
+ ┃ ┃
+ ┃ ┣ 📂 store/                     # GLOBAL STATE YÖNETİMİ (Zustand)
+ ┃ ┃ ┣ 📜 useAuthStore.js          # Kullanıcı oturum bilgileri (isAdmin, userProfile)
+ ┃ ┃ ┣ 📜 useCartStore.js          # Sepet verileri (LocalStorage entegreli, ürün ekle/çıkar/hesapla)
+ ┃ ┃ ┗ 📜 useUiStore.js            # Global UI durumları (Sidebar açık mı, Sepet çekmecesi açık mı)
+ ┃ ┃
+ ┃ ┣ 📂 utils/                     # YARDIMCI FONKSİYONLAR
+ ┃ ┃ ┣ 📜 constants.js             # Sabitler (Kargo ücreti limiti, API endpoint URL'leri)
+ ┃ ┃ ┣ 📜 formatCurrency.js        # Fiyatları TL formatına çevirme (Örn: 1.500,00 ₺)
+ ┃ ┃ ┣ 📜 formatDate.js            # Tarih formatlama (Örn: 24 Haziran 2026)
+ ┃ ┃ ┣ 📜 generateSlug.js          # 'Çiçek Balı' → 'cicek-bali' çevirimi
+ ┃ ┃ ┗ 📜 cn.js                    # Tailwind class birleştirme yardımcısı
+ ┃ ┃
+ ┃ ┗ 📜 middleware.js              # NEXT.JS ROUTE KORUMASI (Token yoksa /admin'e girmeyi engeller)
+ ┃
+ ┣ 📜 .dockerignore                # Docker'a dahil edilmeyecek dosyalar
+ ┣ 📜 Dockerfile                   # Frontend'in container edilmesi
+ ┣ 📜 .env.example                  # Şablon — commit edilir
+ ┣ 📜 jsconfig.json                # Base path ayarları (@/ alias'ları için)
+ ┣ 📜 package.json
+ ┣ 📜 postcss.config.js
+ ┗ 📜 tailwind.config.js           # Dark mode class ayarları ve tema renk paleti
+```
+
+---
+
+## 🐳 Docker & Veritabanı
+
+`docker-compose.yml` kök dizinde PostgreSQL servisini tanımlar:
+
+| Ayar | Değer |
+|------|-------|
+| İmaj | `postgres:15-alpine` |
+| Container | `atala-postgres` |
+| Port | `5433` → `5432` *(yerel PostgreSQL çakışmasını önlemek için)* |
+| DB | `ecommerce_db` |
+| User | `root` |
+| Password | `secretpassword` *(yalnızca geliştirme ortamı)* |
+
+> **Not:** Makinenizde 5432 portunda yerel PostgreSQL çalışıyorsa Docker portu `5433` olarak map edilmiştir. `backend/.env` içindeki `DATABASE_URL` buna göre ayarlanmalıdır.
 
 ```bash
-# 1. Repoyu klonla
+docker compose up -d
+```
+
+---
+
+## 🚀 Kurulum ve Çalıştırma
+
+### 1. Repoyu klonla
+```bash
 git clone https://github.com/KULLANICI_ADIN/atala-ecommerce-boilerplate.git
 cd atala-ecommerce-boilerplate
+```
 
-# 2. Veritabanı
+### 2. Veritabanını başlat
+```bash
 docker compose up -d
+```
 
-# 3. Backend
+### 3. Backend
+```bash
 cd backend
-cp .env.example .env          # Değerleri düzenle
+cp .env.example .env        # İlk kurulumda — değerleri düzenle
 npm install
-npx prisma migrate dev
-npm run dev                   # → http://localhost:3000
+npx prisma migrate dev      # Tabloları oluştur
+npm run dev                 # http://localhost:3000
+```
 
-# 4. Frontend (yeni terminal)
+### 4. Frontend
+```bash
 cd frontend
 cp .env.example .env.local
 npm install
-npm run dev -- -p 3001        # → http://localhost:3001
+npm run dev -- -p 3001      # http://localhost:3001
+```
+
+> Backend ve frontend aynı anda çalışırken port çakışması olmaması için Next.js'i `3001` portunda başlatın.
+
+### 5. Test kullanıcısı oluştur
+```bash
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@atala.com","password":"password123","firstName":"Admin","lastName":"User"}'
 ```
 
 Admin paneli: **http://localhost:3001/admin/login**
@@ -79,162 +323,6 @@ Her yeni freelance işinde şu adımları izleyin:
 - [ ] `frontend/src/utils/constants.js` → API URL, kargo limiti vb.
 - [ ] Backend modüllerini doldur: `catalog`, `orders`…
 - [ ] Domain + SSL + production env ayarları
-
----
-
-## Mimari
-
-### Backend — Domain-Driven Design (DDD)
-
-Her servis (`auth`, `catalog`, `orders`…) kendi kapalı ekosistemine sahiptir:
-
-1. **DTO** — Zod ile istek doğrulama
-2. **Entity** — Domain nesnesi
-3. **Repository** — Sadece Prisma/DB erişimi
-4. **Service** — İş kuralları
-5. **Controller** — HTTP req/res
-
-Modüller birbirinin veritabanına doğrudan erişemez; iletişim Service katmanı üzerinden yapılır.
-
-### Frontend — Feature-Sliced Design (FSD)
-
-- `(store)/` → müşteri vitrini (route group, URL'de görünmez)
-- `admin/` → yönetim paneli
-- `components/ui/` → tekrar kullanılabilir atomlar
-- `services/` → tüm API çağrıları (bileşenlerde doğrudan `fetch` yok)
-
----
-
-## Proje Yapısı
-
-```text
-atala-ecommerce-boilerplate/
- ┣ 📂 backend/              # Express API (Modüler Monolit)
- ┣ 📂 frontend/             # Next.js (Vitrin + Admin)
- ┣ 📜 docker-compose.yml   # PostgreSQL
- ┣ 📜 .gitignore            # Gizli dosyalar hariç tutulur
- ┣ 📜 LICENSE               # MIT
- ┗ 📜 README.md
-```
-
----
-
-## Backend Dizin Yapısı
-
-```text
-backend/
- ┣ 📂 prisma/
- ┃ ┣ 📂 migrations/         # Veritabanı migration dosyaları
- ┃ ┗ 📜 schema.prisma       # Prisma şeması (User modeli vb.)
- ┃
- ┣ 📂 src/
- ┃ ┣ 📂 config/
- ┃ ┃ ┣ 📜 env.js            # Ortam değişkenleri (PORT, JWT, NODE_ENV)
- ┃ ┃ ┗ 📜 database.js       # Prisma Client + PostgreSQL adapter
- ┃ ┃
- ┃ ┣ 📂 core/               # Global altyapı
- ┃ ┃ ┣ 📂 errors/
- ┃ ┃ ┃ ┣ 📜 AppError.js
- ┃ ┃ ┃ ┗ 📜 http-status.js
- ┃ ┃ ┗ 📂 middleware/
- ┃ ┃   ┣ 📜 error-handler.js
- ┃ ┃   ┗ 📜 validate.middleware.js
- ┃ ┃
- ┃ ┣ 📂 modules/            # İZOLE SERVİSLER
- ┃ ┃ ┣ 📂 auth/             # ✅ Kimlik doğrulama (hazır)
- ┃ ┃ ┃ ┣ 📂 controllers/    # auth.controller.js
- ┃ ┃ ┃ ┣ 📂 dtos/           # login.dto.js, register.dto.js
- ┃ ┃ ┃ ┣ 📂 entities/       # user.entity.js
- ┃ ┃ ┃ ┣ 📂 middleware/     # auth.middleware.js (JWT)
- ┃ ┃ ┃ ┣ 📂 repositories/   # user.repository.js (Prisma)
- ┃ ┃ ┃ ┣ 📂 services/       # auth.service.js
- ┃ ┃ ┃ ┗ 📜 auth.routes.js
- ┃ ┃ ┗ 📂 catalog/          # Ürün kataloğu (planlanan)
- ┃ ┃
- ┃ ┣ 📜 app.js
- ┃ ┗ 📜 server.js
- ┃
- ┣ 📜 .env.example           # Şablon — commit edilir
- ┗ 📜 package.json
-```
-
-### Auth API
-
-| Method | Endpoint | Açıklama |
-|--------|----------|----------|
-| `GET` | `/health` | Sunucu durumu |
-| `POST` | `/api/auth/register` | Kayıt |
-| `POST` | `/api/auth/login` | Giriş + JWT |
-| `GET` | `/api/auth/me` | Profil (Bearer token) |
-
----
-
-## Frontend Dizin Yapısı
-
-```text
-frontend/
- ┣ 📂 public/                      # Statik dosyalar
- ┃ ┣ 📂 images/                    # Ürün ve banner görselleri
- ┃ ┣ 📂 icons/                     # İkon seti
- ┃ ┣ 📜 favicon.ico
- ┃ ┣ 📜 manifest.json
- ┃ ┗ 📜 robots.txt
- ┃
- ┣ 📂 src/
- ┃ ┣ 📂 app/
- ┃ ┃ ┣ 📂 (store)/                 # MÜŞTERİ VİTRİNİ
- ┃ ┃ ┃ ┣ 📂 about/                 # Hakkımızda
- ┃ ┃ ┃ ┣ 📂 contact/               # İletişim
- ┃ ┃ ┃ ┣ 📂 products/              # Ürün listesi
- ┃ ┃ ┃ ┃ ┗ 📂 [slug]/              # Ürün detay + components/
- ┃ ┃ ┃ ┣ 📂 cart/                  # Sepet + components/
- ┃ ┃ ┃ ┣ 📂 checkout/              # Ödeme + components/
- ┃ ┃ ┃ ┣ 📂 profile/               # Müşteri paneli + orders/
- ┃ ┃ ┃ ┣ 📜 layout.jsx             # Navbar, Footer
- ┃ ┃ ┃ ┗ 📜 page.jsx               # Ana sayfa
- ┃ ┃ ┃
- ┃ ┃ ┣ 📂 admin/                   # YÖNETİM PANELİ
- ┃ ┃ ┃ ┣ 📂 login/                 # LoginForm, useAdminAuth
- ┃ ┃ ┃ ┣ 📂 dashboard/             # İstatistikler
- ┃ ┃ ┃ ┣ 📂 products/              # Ürün yönetimi
- ┃ ┃ ┃ ┣ 📂 orders/                # Sipariş yönetimi
- ┃ ┃ ┃ ┣ 📂 settings/              # Site ayarları
- ┃ ┃ ┃ ┗ 📜 layout.jsx             # Sidebar, AuthGuard
- ┃ ┃ ┃
- ┃ ┃ ┣ 📜 globals.css
- ┃ ┃ ┣ 📜 layout.jsx
- ┃ ┃ ┗ 📜 not-found.jsx
- ┃ ┃
- ┃ ┣ 📂 components/
- ┃ ┃ ┣ 📂 ui/                      # Button, Input, Modal, Toast…
- ┃ ┃ ┣ 📂 layout/                  # Navbar, Footer, Sidebar, AdminHeader
- ┃ ┃ ┗ 📂 providers/               # ThemeProvider
- ┃ ┃
- ┃ ┣ 📂 hooks/                     # useClickOutside, useDebounce, useMediaQuery
- ┃ ┣ 📂 services/                  # api.js, auth.service.js, product.service.js…
- ┃ ┣ 📂 store/                     # useAuthStore, useCartStore, useUiStore
- ┃ ┣ 📂 utils/                     # constants, formatCurrency, generateSlug…
- ┃ ┗ 📜 middleware.js              # /admin route koruması
- ┃
- ┣ 📜 .env.example                  # Şablon — commit edilir
- ┣ 📜 tailwind.config.js            # Tema renkleri (müşteriye göre değiştir)
- ┗ 📜 package.json
-```
-
----
-
-## Docker & Veritabanı
-
-| Ayar | Değer |
-|------|-------|
-| İmaj | `postgres:15-alpine` |
-| Port | `5433` → `5432` *(yerel PG çakışması için)* |
-| DB | `ecommerce_db` |
-| User / Pass | `root` / `secretpassword` *(dev only)* |
-
-```bash
-docker compose up -d
-```
 
 ---
 
@@ -282,13 +370,13 @@ git push -u origin main
 
 ---
 
-## Geliştirme Kuralları
+## 📜 Geliştirme Kuralları (AI Yönergeleri)
 
-- **TypeScript yok** — Saf JavaScript + JSDoc + Zod
-- **Spagetti kod yasak** — Controller'da iş mantığı, Service'te ham SQL yok
-- **Modül izolasyonu** — DTO → Entity → Repository → Service → Controller
-- **Frontend servis katmanı** — API çağrıları yalnızca `src/services/` üzerinden
-- **Hata toleransı** — Mail, SMS, ödeme gibi dış servisler ana akışı kırmamalı
+- **TypeScript Yok:** Proje saf JavaScript ile yazılacaktır. Gelişmiş tip denetimleri JSDoc ve Zod ile sağlanacaktır.
+- **Spagetti Kod Yasak:** Controller içinde iş mantığı (business logic) yazılamaz; Service içinde doğrudan veritabanı sorgusu atılamaz.
+- **Hata Toleransı:** Dış servislere (Mail, SMS, Ödeme) yapılan istekler ana akışı bozmamalıdır.
+- **Modül İzolasyonu:** Her backend modülü kendi DTO → Entity → Repository → Service → Controller zincirine sahiptir.
+- **Frontend Servis Katmanı:** Bileşenler doğrudan `fetch` atmaz; tüm API çağrıları `src/services/` üzerinden yapılır.
 
 ---
 
