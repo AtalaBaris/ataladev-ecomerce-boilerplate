@@ -219,6 +219,7 @@ frontend/
  ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
  ┃ ┃ ┃ ┣ 📂 settings/              # Site Ayarları (Logo, İletişim bilgileri güncelleme)
  ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
+ ┃ ┃ ┃ ┣ 📜 loading.jsx            # Admin sayfa geçişlerinde spinner (Suspense)
  ┃ ┃ ┃ ┗ 📜 layout.jsx             # Admin Layout'u (Sidebar, Header, AuthGuard)
  ┃ ┃ ┃
  ┃ ┃ ┣ 📜 globals.css              # Tailwind direktifleri ve global CSS değişkenleri (Dark mode)
@@ -233,6 +234,7 @@ frontend/
  ┃ ┃ ┃ ┣ 📜 Badge.jsx              # Örn: Stokta, Tükendi, Kargolandı etiketleri
  ┃ ┃ ┃ ┣ 📜 Modal.jsx
  ┃ ┃ ┃ ┣ 📜 Spinner.jsx
+ ┃ ┃ ┃ ┣ 📜 PageLoader.jsx         # Sayfa geçişi yükleme göstergesi
  ┃ ┃ ┃ ┗ 📜 Toast.jsx              # Bildirim mesajları (Başarılı, Hata vb.)
  ┃ ┃ ┣ 📂 layout/                  # Yapısal Bileşenler
  ┃ ┃ ┃ ┣ 📜 Navbar.jsx             # Vitrin üst menüsü
@@ -331,6 +333,14 @@ cp .env.example .env.local
 npm install
 npm run dev -- -p 3001      # http://localhost:3001
 ```
+
+Production (build sonrası):
+```bash
+npm run build
+npm start                   # http://localhost:3001 (backend 3000'de kalır)
+```
+
+> **Not:** Geliştirmede (`npm run dev`) sayfa geçişlerinde altta "Compiling / Rendering" göstergesi normaldir. Production build'de sayfalar önceden derlenir ve çok daha hızlıdır. Admin panelinde geçişler sırasında `loading.jsx` spinner gösterir.
 
 > Backend ve frontend aynı anda çalışırken port çakışması olmaması için Next.js'i `3001` portunda başlatın.
 
