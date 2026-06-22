@@ -1,6 +1,10 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
-import { API_BASE_URL, AUTH_TOKEN_KEY } from '@/utils/constants';
+import {
+  API_BASE_URL,
+  AUTH_TOKEN_KEY,
+  REFRESH_TOKEN_KEY,
+} from '@/utils/constants';
 import { authService } from './auth.service';
 
 const api = axios.create({
@@ -21,6 +25,24 @@ function processQueue(error, token = null) {
   refreshQueue = [];
 }
 
+function isPublicAdminAuthRequest(url = '') {
+  return (
+    url.includes('/admin/login') ||
+    url.includes('/admin/forgot-password') ||
+    url.includes('/admin/reset-password')
+  );
+}
+
+function shouldAttemptRefresh(error, originalRequest) {
+  if (error.response?.status !== 401) return false;
+  if (originalRequest._retry) return false;
+  if (originalRequest.url?.includes('/admin/refresh')) return false;
+  if (!originalRequest.url?.includes('/api/auth/admin')) return false;
+  if (isPublicAdminAuthRequest(originalRequest.url)) return false;
+  if (!Cookies.get(REFRESH_TOKEN_KEY)) return false;
+  return true;
+}
+
 api.interceptors.request.use(
   (config) => {
     const token = Cookies.get(AUTH_TOKEN_KEY);
@@ -39,13 +61,12 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (
-      error.response?.status !== 401 ||
-      originalRequest._retry ||
-      originalRequest.url?.includes('/admin/refresh') ||
-      !originalRequest.url?.includes('/api/auth/admin')
-    ) {
-      if (error.response?.status === 401 && originalRequest.url?.includes('/api/auth/admin')) {
+    if (!shouldAttemptRefresh(error, originalRequest)) {
+      if (
+        error.response?.status === 401 &&
+        originalRequest.url?.includes('/api/auth/admin') &&
+        !isPublicAdminAuthRequest(originalRequest.url)
+      ) {
         authService.clearTokens();
       }
       return Promise.reject(error);
