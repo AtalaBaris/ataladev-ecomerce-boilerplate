@@ -82,4 +82,11 @@ authRouter.get(
   (req, res, next) => authController.loginLogs(req, res, next),
 );
 
+authRouter.delete(
+  '/admin/login-logs',
+  authenticate,
+  requireAdmin,
+  (req, res, next) => authController.clearLoginLogs(req, res, next),
+);
+
 module.exports = { authRouter };

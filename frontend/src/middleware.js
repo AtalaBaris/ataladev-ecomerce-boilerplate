@@ -1,21 +1,14 @@
 import { NextResponse } from 'next/server';
 import { AUTH_TOKEN_KEY, ADMIN_ROLES } from '@/utils/constants';
 import { decodeJwtPayload } from '@/utils/jwt';
-
-const PUBLIC_ADMIN_PATHS = [
-  '/admin/login',
-  '/admin/forgot-password',
-  '/admin/reset-password',
-];
+import { isPublicAdminPath } from '@/utils/admin-routes';
 
 export function middleware(request) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get(AUTH_TOKEN_KEY)?.value;
-  const isPublicAdminPath = PUBLIC_ADMIN_PATHS.some((path) =>
-    pathname.startsWith(path),
-  );
+  const isPublicAdminRoute = isPublicAdminPath(pathname);
 
-  if (isPublicAdminPath) {
+  if (isPublicAdminRoute) {
     if (pathname === '/admin/login' && token) {
       const payload = decodeJwtPayload(token);
       if (payload && ADMIN_ROLES.includes(payload.role)) {

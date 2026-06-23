@@ -9,6 +9,7 @@ const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
   { href: '/admin/products', label: 'Ürünler', icon: '📦' },
   { href: '/admin/orders', label: 'Siparişler', icon: '🛒' },
+  { href: '/admin/login-logs', label: 'Giriş Logları', icon: '🔐' },
   { href: '/admin/settings', label: 'Ayarlar', icon: '⚙️' },
 ];
 

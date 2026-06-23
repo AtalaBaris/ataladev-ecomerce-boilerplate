@@ -144,6 +144,11 @@ class AuthService {
     return this.loginLogRepository.findRecent(limit);
   }
 
+  async clearLoginLogs() {
+    const deletedCount = await this.loginLogRepository.deleteAll();
+    return { deletedCount };
+  }
+
   async forgotPassword(email) {
     const user = await this.userRepository.findByEmail(email);
 

@@ -147,6 +147,7 @@ backend/
 | `POST` | `/api/auth/admin/reset-password` | — | Yeni şifre belirleme |
 | `GET` | `/api/auth/admin/me` | Admin | Admin profili |
 | `GET` | `/api/auth/admin/login-logs` | Admin | Son giriş denemeleri |
+| `DELETE` | `/api/auth/admin/login-logs` | Admin | Tüm giriş loglarını temizle |
 
 ### Auth Güvenlik Özellikleri
 
@@ -154,7 +155,7 @@ backend/
 |---------|--------|
 | **Rol ayrımı** | Admin paneli yalnızca `ADMIN` rolü; müşteri `USER` |
 | **Access + refresh token** | Access 24h, refresh 7d; refresh hash'lenerek DB'de saklanır |
-| **Login logları** | E-posta, IP, user-agent, başarı/başarısızlık; 30 gün sonra otomatik silinir |
+| **Login logları** | E-posta, IP, user-agent, başarı/başarısızlık; 30 gün sonra otomatik silinir; admin panelden manuel temizleme |
 | **Şifre sıfırlama** | Tek kullanımlık token; reset sonrası tüm refresh token'lar iptal |
 | **Register guard** | Production'da `/register` kapalı (`ENABLE_PUBLIC_REGISTER=true` ile açılır) |
 | **Şifre hash** | bcrypt, 12 salt round |
@@ -217,6 +218,9 @@ frontend/
  ┃ ┃ ┃ ┣ 📂 orders/                # Sipariş Yönetimi
  ┃ ┃ ┃ ┃ ┣ 📂 components/          # OrderListTable.jsx, OrderStatusDropdown.jsx
  ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
+ ┃ ┃ ┃ ┣ 📂 login-logs/             # Giriş logları (tablo + temizleme modalı)
+ ┃ ┃ ┃ ┃ ┣ 📂 components/          # LoginLogsTable.jsx
+ ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
  ┃ ┃ ┃ ┣ 📂 settings/              # Site Ayarları (Logo, İletişim bilgileri güncelleme)
  ┃ ┃ ┃ ┃ ┗ 📜 page.jsx
  ┃ ┃ ┃ ┣ 📜 loading.jsx            # Admin sayfa geçişlerinde spinner (Suspense)
@@ -264,8 +268,10 @@ frontend/
  ┃ ┃
  ┃ ┣ 📂 utils/                     # YARDIMCI FONKSİYONLAR
  ┃ ┃ ┣ 📜 constants.js             # Sabitler (Kargo ücreti limiti, API endpoint URL'leri)
+ ┃ ┃ ┣ 📜 admin-routes.js          # Public admin path kontrolü (login vs login-logs ayrımı)
  ┃ ┃ ┣ 📜 formatCurrency.js        # Fiyatları TL formatına çevirme (Örn: 1.500,00 ₺)
  ┃ ┃ ┣ 📜 formatDate.js            # Tarih formatlama (Örn: 24 Haziran 2026)
+ ┃ ┃ ┣ 📜 formatDateTime.js        # Tarih + saat formatlama (log tablosu)
  ┃ ┃ ┣ 📜 generateSlug.js          # 'Çiçek Balı' → 'cicek-bali' çevirimi
  ┃ ┃ ┗ 📜 cn.js                    # Tailwind class birleştirme yardımcısı
  ┃ ┃

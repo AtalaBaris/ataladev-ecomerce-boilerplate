@@ -100,6 +100,19 @@ class AuthController {
     }
   }
 
+  async clearLoginLogs(req, res, next) {
+    try {
+      const result = await authService.clearLoginLogs();
+      return res.status(HttpStatus.OK).json({
+        success: true,
+        data: result,
+        message: `${result.deletedCount} giriş kaydı silindi.`,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   async forgotPassword(req, res, next) {
     try {
       const result = await authService.forgotPassword(req.validated.email);

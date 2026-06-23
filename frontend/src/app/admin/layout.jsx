@@ -4,16 +4,11 @@ import { usePathname } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { AdminSessionProvider } from '@/components/providers/AdminSessionProvider';
-
-const PUBLIC_ADMIN_PATHS = [
-  '/admin/login',
-  '/admin/forgot-password',
-  '/admin/reset-password',
-];
+import { isPublicAdminPath } from '@/utils/admin-routes';
 
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
-  const isPublicPage = PUBLIC_ADMIN_PATHS.some((path) => pathname.startsWith(path));
+  const isPublicPage = isPublicAdminPath(pathname);
 
   if (isPublicPage) {
     return children;

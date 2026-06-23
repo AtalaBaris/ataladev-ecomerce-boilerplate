@@ -86,6 +86,11 @@ export const authService = {
     return data;
   },
 
+  async clearLoginLogs() {
+    const { data } = await api.delete(API_ENDPOINTS.auth.adminLoginLogs);
+    return data;
+  },
+
   async logout() {
     const refreshToken = Cookies.get(REFRESH_TOKEN_KEY);
 

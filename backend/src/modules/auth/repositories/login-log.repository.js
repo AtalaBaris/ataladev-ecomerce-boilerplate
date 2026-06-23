@@ -39,6 +39,11 @@ class LoginLogRepository {
 
     return result.count;
   }
+
+  async deleteAll() {
+    const result = await prisma.loginLog.deleteMany();
+    return result.count;
+  }
 }
 
 module.exports = { LoginLogRepository };
