@@ -19,6 +19,8 @@ export const API_ENDPOINTS = {
     adminLoginLogs: '/api/auth/admin/login-logs',
     login: '/api/auth/login',
     register: '/api/auth/register',
+    refresh: '/api/auth/refresh',
+    logout: '/api/auth/logout',
     me: '/api/auth/me',
   },
   products: '/api/products',

@@ -2,29 +2,41 @@ import { NextResponse } from 'next/server';
 import { AUTH_TOKEN_KEY, ADMIN_ROLES } from '@/utils/constants';
 import { decodeJwtPayload } from '@/utils/jwt';
 import { isPublicAdminPath } from '@/utils/admin-routes';
+import { isPublicAuthPath } from '@/utils/auth-routes';
 
 export function middleware(request) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get(AUTH_TOKEN_KEY)?.value;
-  const isPublicAdminRoute = isPublicAdminPath(pathname);
+  const payload = token ? decodeJwtPayload(token) : null;
 
-  if (isPublicAdminRoute) {
-    if (pathname === '/admin/login' && token) {
-      const payload = decodeJwtPayload(token);
-      if (payload && ADMIN_ROLES.includes(payload.role)) {
-        return NextResponse.redirect(new URL('/admin/dashboard', request.url));
-      }
+  if (isPublicAuthPath(pathname)) {
+    if (payload && !ADMIN_ROLES.includes(payload.role)) {
+      return NextResponse.redirect(new URL('/profile', request.url));
+    }
+    return NextResponse.next();
+  }
+
+  if (pathname === '/profile' || pathname.startsWith('/profile/')) {
+    if (!token || !payload) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+  }
+
+  if (isPublicAdminPath(pathname)) {
+    if (pathname === '/admin/login' && payload && ADMIN_ROLES.includes(payload.role)) {
+      return NextResponse.redirect(new URL('/admin/dashboard', request.url));
     }
     return NextResponse.next();
   }
 
   if (pathname.startsWith('/admin')) {
-    if (!token) {
+    if (!token || !payload) {
       return NextResponse.redirect(new URL('/admin/login', request.url));
     }
 
-    const payload = decodeJwtPayload(token);
-    if (!payload || !ADMIN_ROLES.includes(payload.role)) {
+    if (!ADMIN_ROLES.includes(payload.role)) {
       const response = NextResponse.redirect(new URL('/admin/login', request.url));
       response.cookies.delete(AUTH_TOKEN_KEY);
       return response;
@@ -35,5 +47,11 @@ export function middleware(request) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: [
+    '/admin/:path*',
+    '/login',
+    '/register',
+    '/profile',
+    '/profile/:path*',
+  ],
 };
