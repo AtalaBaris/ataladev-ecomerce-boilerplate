@@ -40,6 +40,19 @@ class LoginLogRepository {
     return result.count;
   }
 
+  async countRecentFailuresByEmail(email, windowMinutes) {
+    const since = new Date();
+    since.setMinutes(since.getMinutes() - windowMinutes);
+
+    return prisma.loginLog.count({
+      where: {
+        email,
+        success: false,
+        createdAt: { gte: since },
+      },
+    });
+  }
+
   async deleteAll() {
     const result = await prisma.loginLog.deleteMany();
     return result.count;

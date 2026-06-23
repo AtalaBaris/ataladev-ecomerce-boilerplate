@@ -59,10 +59,17 @@ class AuthService {
   }
 
   async _loginWithRoleCheck(dto, allowedRoles, meta) {
+    if (await this._isEmailLoginLocked(dto.email)) {
+      this._throwLoginRateLimitError();
+    }
+
     const user = await this.userRepository.findByEmail(dto.email);
 
     if (!user) {
       await this._logAttempt(dto.email, false, meta);
+      if (await this._isEmailLoginLocked(dto.email)) {
+        this._throwLoginRateLimitError();
+      }
       throw new AppError(
         'E-posta veya şifre hatalı.',
         HttpStatus.UNAUTHORIZED,
@@ -74,6 +81,9 @@ class AuthService {
 
     if (!isPasswordValid) {
       await this._logAttempt(dto.email, false, { ...meta, userId: user.id });
+      if (await this._isEmailLoginLocked(dto.email)) {
+        this._throwLoginRateLimitError();
+      }
       throw new AppError(
         'E-posta veya şifre hatalı.',
         HttpStatus.UNAUTHORIZED,
@@ -83,6 +93,9 @@ class AuthService {
 
     if (allowedRoles && !allowedRoles.includes(user.role)) {
       await this._logAttempt(dto.email, false, { ...meta, userId: user.id });
+      if (await this._isEmailLoginLocked(dto.email)) {
+        this._throwLoginRateLimitError();
+      }
       throw new AppError(
         'Bu hesapla yönetim paneline erişim yetkiniz yok.',
         HttpStatus.FORBIDDEN,
@@ -265,6 +278,27 @@ class AuthService {
     } catch (error) {
       console.error('[AuthService] Login log yazılamadı:', error.message);
     }
+  }
+
+  async _isEmailLoginLocked(email) {
+    const { loginEmailMaxAttempts, loginRateLimitWindowMinutes } = env.auth;
+
+    if (loginEmailMaxAttempts <= 0) return false;
+
+    const failures = await this.loginLogRepository.countRecentFailuresByEmail(
+      email,
+      loginRateLimitWindowMinutes,
+    );
+
+    return failures >= loginEmailMaxAttempts;
+  }
+
+  _throwLoginRateLimitError() {
+    throw new AppError(
+      `Çok fazla başarısız giriş denemesi. ${env.auth.loginRateLimitWindowMinutes} dakika sonra tekrar deneyin.`,
+      HttpStatus.TOO_MANY_REQUESTS,
+      'LOGIN_RATE_LIMIT',
+    );
   }
 }
 

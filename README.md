@@ -35,7 +35,7 @@ Yeni bir müşteri geldiğinde sıfırdan mimari kurmak yerine bu repodan başla
 | **State & API** | Zustand, Axios, js-cookie |
 | **Doğrulama** | Zod (Backend DTO katmanı) |
 | **Altyapı** | Docker & Docker Compose |
-| **Kimlik Doğrulama** | bcryptjs, jsonwebtoken, nodemailer (şifre sıfırlama) |
+| **Kimlik Doğrulama** | bcryptjs, jsonwebtoken, nodemailer, express-rate-limit |
 
 ---
 
@@ -96,6 +96,7 @@ backend/
  ┃ ┃ ┗ 📂 middleware/
  ┃ ┃   ┣ 📜 error-handler.js # Global Express hata yakalayıcı
  ┃ ┃   ┣ 📜 validate.middleware.js  # Zod tabanlı istek doğrulama
+ ┃ ┃   ┣ 📜 login-rate-limit.middleware.js  # Login brute-force koruması (IP + e-posta)
  ┃ ┃   ┗ 📜 require-admin.js # Admin rol kontrolü (re-export)
  ┃ ┃
  ┃ ┣ 📂 modules/             # İZOLE SERVİSLER
@@ -156,6 +157,7 @@ backend/
 | **Rol ayrımı** | Admin paneli yalnızca `ADMIN` rolü; müşteri `USER` |
 | **Access + refresh token** | Access 24h, refresh 7d; refresh hash'lenerek DB'de saklanır |
 | **Login logları** | E-posta, IP, user-agent, başarı/başarısızlık; 30 gün sonra otomatik silinir; admin panelden manuel temizleme |
+| **Login rate limit** | Production: IP 10 / e-posta 5 başarısız deneme (15 dk). Development varsayılan: 100 |
 | **Şifre sıfırlama** | Tek kullanımlık token; reset sonrası tüm refresh token'lar iptal |
 | **Register guard** | Production'da `/register` kapalı (`ENABLE_PUBLIC_REGISTER=true` ile açılır) |
 | **Şifre hash** | bcrypt, 12 salt round |
@@ -392,6 +394,26 @@ npm run prisma:studio
 ```
 `login_logs` tablosunu açın.
 
+### Login rate limit
+
+`/api/auth/login` ve `/api/auth/admin/login` için çift katmanlı koruma:
+
+| Ortam | E-posta limiti | IP + e-posta limiti | Pencere |
+|-------|----------------|---------------------|---------|
+| **Production** | 5 başarısız deneme | 10 başarısız deneme | 15 dk |
+| **Development** | 100 (varsayılan) | 100 (varsayılan) | 15 dk |
+
+- Başarılı girişler sayılmaz.
+- Limit dolunca `429` + *"Çok fazla başarısız giriş denemesi..."*
+- Sıfırlama: pencere süresini bekle veya admin panelden **Giriş Logları → Tümünü Temizle**
+
+`.env` ile özelleştirme:
+```env
+LOGIN_EMAIL_MAX_ATTEMPTS=5
+LOGIN_RATE_LIMIT_MAX=10
+LOGIN_RATE_LIMIT_WINDOW_MINUTES=15
+```
+
 ### Şifre sıfırlama (geliştirme)
 SMTP yapılandırılmadıysa sıfırlama linki **yalnızca backend terminalinde** görünür (`npm run dev` penceresi). Frontend genel bir onay mesajı gösterir; link API yanıtında dönmez.
 
@@ -423,7 +445,7 @@ Her yeni freelance işinde şu adımları izleyin:
 | `frontend/.env.example` | ✅ Evet | Şablon |
 | `frontend/.env.local` | ❌ Hayır | API URL |
 
-**Backend önemli değişkenler:** `JWT_SECRET`, `APP_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ENABLE_PUBLIC_REGISTER`, `LOGIN_LOG_RETENTION_DAYS`, `PASSWORD_RESET_EXPIRES_MINUTES`, `SMTP_*`
+**Backend önemli değişkenler:** `JWT_SECRET`, `APP_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ENABLE_PUBLIC_REGISTER`, `LOGIN_LOG_RETENTION_DAYS`, `PASSWORD_RESET_EXPIRES_MINUTES`, `LOGIN_RATE_LIMIT_MAX`, `LOGIN_RATE_LIMIT_WINDOW_MINUTES`, `LOGIN_EMAIL_MAX_ATTEMPTS`, `SMTP_*`
 
 ```bash
 cp backend/.env.example backend/.env
@@ -452,7 +474,7 @@ git push -u origin main
 
 | Modül | Backend | Frontend | Durum |
 |-------|---------|----------|-------|
-| Auth | ✅ Tam (admin güvenlik) | ✅ Login, forgot/reset, middleware | Hazır |
+| Auth | ✅ Tam (admin güvenlik) | ✅ Login, forgot/reset, login logları UI | Hazır |
 | Catalog | 🔲 | 🔲 Placeholder | Sırada |
 | Orders | 🔲 | 🔲 Placeholder | Sırada |
 | Cart | — | 🔲 Zustand store | Kısmi |

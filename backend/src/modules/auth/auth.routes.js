@@ -11,6 +11,7 @@ const {
 const { authenticate } = require('./middleware/auth.middleware');
 const { requireAdmin } = require('./middleware/require-admin.middleware');
 const { registerGuard } = require('./middleware/register-guard.middleware');
+const { loginRateLimiter } = require('../../core/middleware/login-rate-limit.middleware');
 const { AuthController } = require('./controllers/auth.controller');
 
 const authRouter = Router();
@@ -28,6 +29,7 @@ authRouter.post(
 authRouter.post(
   '/login',
   validate(loginSchema),
+  loginRateLimiter,
   (req, res, next) => authController.login(req, res, next),
 );
 
@@ -35,6 +37,7 @@ authRouter.post(
 authRouter.post(
   '/admin/login',
   validate(loginSchema),
+  loginRateLimiter,
   (req, res, next) => authController.adminLogin(req, res, next),
 );
 

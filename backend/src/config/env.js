@@ -13,6 +13,14 @@ const env = {
     enablePublicRegister: process.env.ENABLE_PUBLIC_REGISTER === 'true',
     loginLogRetentionDays: Number(process.env.LOGIN_LOG_RETENTION_DAYS) || 30,
     passwordResetExpiresMinutes: Number(process.env.PASSWORD_RESET_EXPIRES_MINUTES) || 60,
+    loginRateLimitMax:
+      Number(process.env.LOGIN_RATE_LIMIT_MAX) ||
+      (process.env.NODE_ENV === 'production' ? 10 : 100),
+    loginRateLimitWindowMinutes:
+      Number(process.env.LOGIN_RATE_LIMIT_WINDOW_MINUTES) || 15,
+    loginEmailMaxAttempts:
+      Number(process.env.LOGIN_EMAIL_MAX_ATTEMPTS) ||
+      (process.env.NODE_ENV === 'production' ? 5 : 100),
   },
   admin: {
     email: process.env.ADMIN_EMAIL || 'admin@atala.com',
