@@ -33,6 +33,18 @@ authRouter.post(
   (req, res, next) => authController.login(req, res, next),
 );
 
+authRouter.post(
+  '/refresh',
+  validate(refreshTokenSchema),
+  (req, res, next) => authController.refresh(req, res, next),
+);
+
+authRouter.post(
+  '/logout',
+  validate(logoutSchema),
+  (req, res, next) => authController.logout(req, res, next),
+);
+
 // Admin paneli girişi — yalnızca ADMIN rolü
 authRouter.post(
   '/admin/login',

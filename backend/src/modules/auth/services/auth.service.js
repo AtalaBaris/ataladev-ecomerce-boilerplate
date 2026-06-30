@@ -48,9 +48,11 @@ class AuthService {
     return this._issueTokenPair(user);
   }
 
-  /** Müşteri vitrini için (ileride) — USER rolü */
+  /** Müşteri vitrini — yalnızca USER rolü */
   async login(dto, meta = {}) {
-    return this._loginWithRoleCheck(dto, null, meta);
+    return this._loginWithRoleCheck(dto, [ROLES.USER], meta, {
+      maskRoleMismatch: true,
+    });
   }
 
   /** Admin paneli — yalnızca ADMIN rolü */
@@ -58,7 +60,8 @@ class AuthService {
     return this._loginWithRoleCheck(dto, ADMIN_ROLES, meta);
   }
 
-  async _loginWithRoleCheck(dto, allowedRoles, meta) {
+  async _loginWithRoleCheck(dto, allowedRoles, meta, options = {}) {
+    const { maskRoleMismatch = false } = options;
     if (await this._isEmailLoginLocked(dto.email)) {
       this._throwLoginRateLimitError();
     }
@@ -97,9 +100,11 @@ class AuthService {
         this._throwLoginRateLimitError();
       }
       throw new AppError(
-        'Bu hesapla yönetim paneline erişim yetkiniz yok.',
-        HttpStatus.FORBIDDEN,
-        'FORBIDDEN',
+        maskRoleMismatch
+          ? 'E-posta veya şifre hatalı.'
+          : 'Bu hesapla yönetim paneline erişim yetkiniz yok.',
+        maskRoleMismatch ? HttpStatus.UNAUTHORIZED : HttpStatus.FORBIDDEN,
+        maskRoleMismatch ? 'INVALID_CREDENTIALS' : 'FORBIDDEN',
       );
     }
 

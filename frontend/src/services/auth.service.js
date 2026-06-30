@@ -29,6 +29,34 @@ function clearTokens() {
 }
 
 export const authService = {
+  async login(email, password) {
+    const { data } = await api.post(API_ENDPOINTS.auth.login, {
+      email,
+      password,
+    });
+
+    if (data.success && data.data?.accessToken) {
+      storeTokens(data.data.accessToken, data.data.refreshToken);
+    }
+
+    return data;
+  },
+
+  async register({ email, password, firstName, lastName }) {
+    const { data } = await api.post(API_ENDPOINTS.auth.register, {
+      email,
+      password,
+      firstName,
+      lastName,
+    });
+
+    if (data.success && data.data?.accessToken) {
+      storeTokens(data.data.accessToken, data.data.refreshToken);
+    }
+
+    return data;
+  },
+
   async adminLogin(email, password) {
     const { data } = await api.post(API_ENDPOINTS.auth.adminLogin, {
       email,
@@ -48,7 +76,7 @@ export const authService = {
       throw new Error('Refresh token yok.');
     }
 
-    const { data } = await api.post(API_ENDPOINTS.auth.adminRefresh, {
+    const { data } = await api.post(API_ENDPOINTS.auth.refresh, {
       refreshToken,
     });
 
@@ -56,6 +84,11 @@ export const authService = {
       storeTokens(data.data.accessToken, data.data.refreshToken);
     }
 
+    return data;
+  },
+
+  async verifySession() {
+    const { data } = await api.get(API_ENDPOINTS.auth.me);
     return data;
   },
 
@@ -95,7 +128,7 @@ export const authService = {
     const refreshToken = Cookies.get(REFRESH_TOKEN_KEY);
 
     try {
-      await api.post(API_ENDPOINTS.auth.adminLogout, {
+      await api.post(API_ENDPOINTS.auth.logout, {
         refreshToken: refreshToken || undefined,
       });
     } finally {
